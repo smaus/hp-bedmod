@@ -1,0 +1,143 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+namespace Un
+{
+	public class Lucky
+	{
+		private static bool isDrain = false;
+		private static float drainTime = GameManager.get_System().Lifetime(true);
+		private static float drainFix = GameManager.get_System().Lifetime(true);
+		private static float drainRate = 0.05f;
+		private static float drainRateFix = 0.05f;
+		public static void Init()
+		{
+			if (GameManager.get_System().get_Player().get_alphaModeActive())
+			{
+				GameManager.get_System().get_Player().set_settingsDifficulty(2);
+			}
+		}
+		public static bool Play(InventoryItemPlayerData[] inv = null)
+		{
+			if (inv == null)
+			{
+				inv = GameManager.get_System().get_Player().get_inventory();
+			}
+			if (!GameManager.get_Stage().cellPhone.IsOpen() && (GameManager.get_System().get_Player().get_girls()[GameManager.get_System().get_Location().currentGirl.id - 1].get_gotPanties() || GameManager.get_System().get_Clock().DayTime(-1) != 3))
+			{
+				return false;
+			}
+			for (int i = 0; i < inv.Length; i++)
+			{
+				if (inv[i].get_itemDefinition() == null)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		public static void PuzzleDrain()
+		{
+			if (GameManager.get_System().get_Puzzle().get_Game().get_isBonusRound())
+			{
+				if (!Lucky.isDrain)
+				{
+					Lucky.isDrain = true;
+					Lucky.drainTime = GameManager.get_System().Lifetime(true);
+					Lucky.drainFix = GameManager.get_System().Lifetime(true);
+					switch (GameManager.get_System().get_Player().get_settingsDifficulty())
+					{
+					case 0:
+						Lucky.drainRateFix = 0.065f;
+						break;
+					case 2:
+						Lucky.drainRateFix = 0.035f;
+						break;
+					}
+				}
+				if (GameManager.get_System().get_Puzzle().get_Game().get_puzzleGameState() == 9)
+				{
+					Lucky.isDrain = false;
+				}
+				switch (GameManager.get_System().get_Player().get_settingsDifficulty())
+				{
+				case 0:
+					Lucky.drainRate = 0.08f;
+					break;
+				case 1:
+					Lucky.drainRate = 0.05f;
+					break;
+				case 2:
+					Lucky.drainRate = 0.035f;
+					break;
+				}
+				if (GameManager.get_System().Lifetime(true) - Lucky.drainFix >= Lucky.drainRateFix && GameManager.get_System().get_Puzzle().get_Game().currentDisplayAffection > 0)
+				{
+					Lucky.drainFix = GameManager.get_System().Lifetime(true);
+					GameManager.get_System().get_Puzzle().get_Game().AddResourceValue(0, 1, true);
+				}
+				float num = GameManager.get_System().Lifetime(true) - Lucky.drainTime;
+				int num2 = 470 + 25 * GameManager.get_System().get_Player().GetTotalMaxRelationships();
+				if (num >= Lucky.drainRate)
+				{
+					int num3 = Mathf.FloorToInt(num / Lucky.drainRate);
+					Lucky.drainTime += Lucky.drainRate * (float)num3;
+					if (GameManager.get_System().get_Puzzle().get_Game().currentDisplayAffection >= num2)
+					{
+						num3 = -1;
+					}
+					GameManager.get_System().get_Puzzle().get_Game().AddResourceValue(0, -num3, true);
+				}
+			}
+		}
+		public static PuzzleTokenDefinition[] GetAll(bool bonusRoundOnly = false)
+		{
+			PuzzleTokenDefinition[] array = Resources.FindObjectsOfTypeAll(typeof(PuzzleTokenDefinition)) as PuzzleTokenDefinition[];
+			List<PuzzleTokenDefinition> list = new List<PuzzleTokenDefinition>();
+			if (bonusRoundOnly)
+			{
+				if (GameManager.get_System().get_Player().get_settingsDifficulty() == 2)
+				{
+					array[0].bonusMatchSound = array[1].bonusMatchSound;
+					array[0].negateResource = false;
+					array[0].levels[0].spriteName = "puzzle_token_flirtation_double";
+					array[0].levels[0].overSpriteName = "puzzle_token_flirtation_double_over";
+					list.Add(array[0]);
+					array[2].bonusMatchSound = array[7].bonusMatchSound;
+					array[2].levels[0].spriteName = "puzzle_token_talent_double";
+					array[2].levels[0].overSpriteName = "puzzle_token_talent_double_over";
+					list.Add(array[2]);
+				}
+				else
+				{
+					if (GameManager.get_System().get_Player().get_settingsDifficulty() == 1)
+					{
+						array[1].levels[0].bonusSpriteName = "puzzle_token_flirtation_bonus";
+						array[1].levels[0].bonusOverSpriteName = "puzzle_token_flirtation_bonus_over";
+						array[4].levels[0].bonusSpriteName = "puzzle_token_romance_bonus";
+						array[4].levels[0].bonusOverSpriteName = "puzzle_token_romance_bonus_over";
+						array[3].levels[0].bonusSpriteName = "puzzle_token_romance_double";
+						array[3].levels[0].bonusOverSpriteName = "puzzle_token_romance_double_over";
+						array[5].levels[0].bonusSpriteName = "puzzle_token_sexual_double";
+						array[5].levels[0].bonusOverSpriteName = "puzzle_token_sexual_double_over";
+						array[6].levels[0].bonusSpriteName = "puzzle_token_sexual_bonus";
+						array[6].levels[0].bonusOverSpriteName = "puzzle_token_sexual_bonus_over";
+						array[7].levels[0].bonusSpriteName = "puzzle_token_talent_bonus";
+						array[7].levels[0].bonusOverSpriteName = "puzzle_token_talent_bonus_over";
+					}
+				}
+				if (GameManager.get_System().get_Player().get_settingsDifficulty() != null)
+				{
+					list.Add(array[5]);
+				}
+				list.Add(array[1]);
+				list.Add(array[3]);
+				list.Add(array[4]);
+				list.Add(array[6]);
+				list.Add(array[7]);
+				return list.ToArray();
+			}
+			return array;
+		}
+	}
+}

@@ -1,0 +1,142 @@
+using Mono.Cecil;
+using Mono.Cecil.Cil;
+using System;
+using System.Reflection;
+using Un;
+namespace hpfixer
+{
+	internal class MainClass
+	{
+		public static void Main(string[] args)
+		{
+			ModuleDefinition moduleDefinition = ModuleDefinition.ReadModule("Assembly-CSharp.dll");
+			TypeDefinition type = moduleDefinition.GetType("GameManager");
+			if (MainClass.isPatched(type))
+			{
+				Console.WriteLine("Assembly already patched");
+				return;
+			}
+			MainClass.markTypePatched(moduleDefinition, type);
+			MainClass.hardA(moduleDefinition);
+			MainClass.alphaInv(moduleDefinition);
+			MainClass.puzzDiff(moduleDefinition);
+			MainClass.puzzDrain(moduleDefinition);
+			moduleDefinition.Write("Assembly-CSharp-PATCHED.dll");
+			Console.WriteLine("Done");
+		}
+		private static void hardA(ModuleDefinition module)
+		{
+			TypeDefinition type = module.GetType("GameManager");
+			MainClass.addHook(type, "BeginGameSession", false, 0, true, typeof(Lucky).GetMethod("Init"));
+		}
+		private static void alphaInv(ModuleDefinition module)
+		{
+			TypeDefinition type = module.GetType("PlayerManager");
+			MainClass.replaceMethod(type, "IsInventoryFull", false, 1, typeof(Lucky).GetMethod("Play"));
+		}
+		private static void puzzDiff(ModuleDefinition module)
+		{
+			TypeDefinition type = module.GetType("PuzzleTokenData");
+			MainClass.replaceMethod(type, "GetAll", false, 1, typeof(Lucky).GetMethod("GetAll"));
+		}
+		private static void puzzDrain(ModuleDefinition module)
+		{
+			TypeDefinition type = module.GetType("PuzzleGame");
+			MainClass.addHook(type, "OnUpdate", false, 0, false, typeof(Lucky).GetMethod("PuzzleDrain"));
+		}
+		private static void markTypePatched(ModuleDefinition module, TypeDefinition type)
+		{
+			type.Fields.Add(new FieldDefinition("UnLuckyPatch", Mono.Cecil.FieldAttributes.Private | Mono.Cecil.FieldAttributes.SpecialName, module.Import(typeof(int))));
+		}
+		private static void addHook(TypeDefinition type, string methodName, bool addThisRef, int opCount, bool atEnd, MethodBase targetMethod)
+		{
+			foreach (MethodDefinition current in type.Methods)
+			{
+				if (current.Name.Equals(methodName))
+				{
+					ILProcessor iLProcessor = current.Body.GetILProcessor();
+					Instruction instruction = iLProcessor.Create(OpCodes.Call, current.Module.Import(targetMethod));
+					if (atEnd)
+					{
+						int count = current.Body.Instructions.Count;
+						if (addThisRef)
+						{
+							iLProcessor.Append(iLProcessor.Create(OpCodes.Ldarg, 0));
+						}
+						for (int i = 0; i < opCount; i++)
+						{
+							iLProcessor.Append(iLProcessor.Create(OpCodes.Ldarg, i + 1));
+						}
+						iLProcessor.Append(instruction);
+						iLProcessor.Remove(current.Body.Instructions[count - 1]);
+						iLProcessor.Append(iLProcessor.Create(OpCodes.Ret));
+					}
+					else
+					{
+						int num = 0;
+						if (addThisRef)
+						{
+							iLProcessor.InsertBefore(current.Body.Instructions[num++], iLProcessor.Create(OpCodes.Ldarg, 0));
+						}
+						for (int j = 0; j < opCount; j++)
+						{
+							iLProcessor.InsertBefore(current.Body.Instructions[num++], iLProcessor.Create(OpCodes.Ldarg, j + 1));
+						}
+						iLProcessor.InsertBefore(current.Body.Instructions[num++], instruction);
+					}
+					return;
+				}
+			}
+			Console.WriteLine(string.Concat(new string[]
+			{
+				"ERROR: Did not find ",
+				type.Name,
+				".",
+				methodName,
+				"()"
+			}));
+		}
+		private static void replaceMethod(TypeDefinition type, string methodName, bool addThisRef, int opCount, MethodBase targetMethod)
+		{
+			foreach (MethodDefinition current in type.Methods)
+			{
+				if (current.Name.Equals(methodName))
+				{
+					ILProcessor iLProcessor = current.Body.GetILProcessor();
+					Instruction instruction = iLProcessor.Create(OpCodes.Call, current.Module.Import(targetMethod));
+					int num = 0;
+					if (addThisRef)
+					{
+						iLProcessor.InsertBefore(current.Body.Instructions[num++], iLProcessor.Create(OpCodes.Ldarg, 0));
+					}
+					for (int i = 0; i < opCount; i++)
+					{
+						iLProcessor.InsertBefore(current.Body.Instructions[num++], iLProcessor.Create(OpCodes.Ldarg, i + 1));
+					}
+					iLProcessor.InsertBefore(current.Body.Instructions[num++], instruction);
+					iLProcessor.InsertBefore(current.Body.Instructions[num++], iLProcessor.Create(OpCodes.Ret));
+					return;
+				}
+			}
+			Console.WriteLine(string.Concat(new string[]
+			{
+				"ERROR: Did not find ",
+				type.Name,
+				".",
+				methodName,
+				"()"
+			}));
+		}
+		private static bool isPatched(TypeDefinition type)
+		{
+			foreach (FieldDefinition current in type.Fields)
+			{
+				if (current.Name.Equals("UnLuckyPatch"))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+}
